@@ -13,7 +13,7 @@ app.tweet.app のフォントサイズ・コンテンツ表示幅を調整し、
 ## インストール
 
 1. [Tampermonkey](https://www.tampermonkey.net/) をブラウザにインストール
-2. [tweet-app-display-and-linkcard.user.js](./tweet-app-display-and-linkcard.user.js) を開き、Tampermonkeyに追加
+2. [tweet-app-font-media-size_user.js](./tweet-app-font-media-size_user.js) を開き、Tampermonkeyに追加
 
 ## 使い方
 
