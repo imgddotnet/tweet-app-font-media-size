@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Tweet.app 表示調整 + リンクカード
+// @name         Tweet.app フォント・幅調整 + リンクカード + 投稿欄表示切替
 // @namespace    https://imgd.net/
-// @version      1.0
-// @description  app.tweet.app のフォントサイズ・コンテンツ表示幅の調整、および本文URLへのOGPリンクカード表示(on/off切替可)
+// @version      1.1
+// @description  app.tweet.app のフォントサイズ・コンテンツ表示幅の調整、本文URLへのOGPリンクカード表示、常時表示の投稿欄の表示/非表示切替
 // @match        https://app.tweet.app/*
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -24,8 +24,10 @@
 
   const LINKCARD_KEY = 'tweetapp_linkcard_enabled';
   const DEFAULT_LINKCARD_ENABLED = true;
+  const LINKCARD_CLASS = 'ogp-link-card';
 
-  const LINKCARD_CLASS = 'ogp-link-card'; // 幅調整CSSの対象に加えるクラス
+  const COMPOSER_KEY = 'tweetapp_composer_visible';
+  const DEFAULT_COMPOSER_VISIBLE = true;
 
   function getFontSize() { return GM_getValue(FONT_KEY, DEFAULT_FONT_SIZE); }
   function setFontSize(px) { GM_setValue(FONT_KEY, px); applyStyles(); }
@@ -40,7 +42,10 @@
     else document.querySelectorAll('article').forEach(processArticle);
   }
 
-  // ---------- スタイル適用(フォント・幅) ----------
+  function isComposerVisible() { return GM_getValue(COMPOSER_KEY, DEFAULT_COMPOSER_VISIBLE); }
+  function setComposerVisible(v) { GM_setValue(COMPOSER_KEY, v); applyStyles(); }
+
+  // ---------- スタイル適用(フォント・幅・投稿欄表示) ----------
   let styleEl = null;
 
   function applyStyles() {
@@ -51,6 +56,8 @@
     }
     const fontSize = getFontSize();
     const mediaPct = getMediaPct();
+    const composerVisible = isComposerVisible();
+
     styleEl.textContent = `
       /* ツイート本文表示 */
       article p.text-tl-app-text,
@@ -68,6 +75,12 @@
         margin-left: auto !important;
         margin-right: auto !important;
       }
+
+      /* 常時表示の投稿欄(アバター・アイコン・Tweetボタンを含む外枠全体、モーダル欄は対象外) */
+      ${composerVisible ? '' : `
+      div.px-4.pt-5.pb-4:has(#public-tweet-input) {
+        display: none !important;
+      }`}
     `;
   }
 
@@ -100,9 +113,16 @@
     alert(`リンクカード表示: ${next ? 'ON' : 'OFF'}`);
   }
 
+  function toggleComposer() {
+    const next = !isComposerVisible();
+    setComposerVisible(next);
+    alert(`投稿欄表示: ${next ? 'ON' : 'OFF'}`);
+  }
+
   GM_registerMenuCommand('フォントサイズ変更', promptFontSize);
   GM_registerMenuCommand('画像・動画・リンクカードの幅を変更', promptMediaWidth);
   GM_registerMenuCommand('リンクカード表示 ON/OFF', toggleLinkCard);
+  GM_registerMenuCommand('投稿欄表示 ON/OFF', toggleComposer);
 
   // ---------- リンクカード ----------
   const cache = new Map();
@@ -141,7 +161,6 @@
   }
 
   function buildCard(data, url) {
-    // タグ名div限定のCSSセレクタに一致させるため外側はdivでラップ
     const wrapper = document.createElement('div');
     wrapper.dataset.ogpCard = url;
     wrapper.className = `rounded-2xl overflow-hidden ${LINKCARD_CLASS}`;
@@ -193,7 +212,7 @@
     fetchOgp(url, (data) => {
       if (article.dataset.ogpFetching !== url) return;
       delete article.dataset.ogpFetching;
-      if (!isLinkCardEnabled()) return; // 取得中にOFFにされた場合
+      if (!isLinkCardEnabled()) return;
       if (!data) return;
       if (article.querySelector('[data-ogp-card]')) return;
 
