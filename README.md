@@ -1,4 +1,4 @@
-# tweet-app-display-and-linkcard
+# tweet-app-font-media-size
 
 app.tweet.app のフォントサイズ・コンテンツ表示幅を調整し、ツイート本文中のURLにOGPリンクカードを表示するTampermonkeyユーザースクリプト。
 
@@ -38,7 +38,7 @@ Tampermonkeyのメニューアイコンから以下を実行:
 
 ## 動作環境
 
-- Safari(Mac / iPhone / iPad)+ Tampermonkey で確認
+- Safari(Mac / iPhone / iPad)+ Tampermonkey で確認、他のwebブラウザやTampermonkey互換機能拡張では動作未確認
 - `https://app.tweet.app/*` 専用
 
 ## ライセンス
