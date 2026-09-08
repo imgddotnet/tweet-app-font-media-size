@@ -227,9 +227,7 @@
     document.body.appendChild(overlay);
   }
 
-  // ============================================================
-  // Tampermonkeyメニューコマンド
-  // ============================================================
+
 
   function chooseFontSize() {
     const presets = CONFIG.font.presets;
@@ -429,8 +427,9 @@
           if (node.matches?.('article')) processArticle(node);
           node.querySelectorAll?.('article').forEach(processArticle);
         });
-        if (m.type === 'characterData' || m.type === 'attributes') {
-          const article = m.target.closest?.('article');
+        if (m.type === 'characterData') {
+          const targetEl = m.target.parentElement; // characterDataはテキストノードが対象
+          const article = targetEl?.closest?.('article');
           if (article) processArticle(article);
         }
       });
@@ -440,7 +439,6 @@
       childList: true,
       subtree: true,
       characterData: true,
-      attributes: true,
     });
   }
 
