@@ -9,6 +9,7 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_xmlhttpRequest
 // @connect      *
+// @icon         https://app.tweet.app/assets/brand/bird-blue.svg
 // @run-at       document-start
 // ==/UserScript==
 
