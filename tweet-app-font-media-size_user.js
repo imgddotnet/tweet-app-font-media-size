@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Tweet.app Font/Width Adjust + Link Card + Composer Toggle
 // @namespace    https://imgd.net/
-// @version      1.9
+// @version      2.0
 // @description  Adjust font size and content width on app.tweet.app (with a tap-select panel), show OGP link cards for URLs in tweet text (with persistent cache), toggle the always-visible composer, and toggle video/GIF autoplay.
 // @match        https://app.tweet.app/*
 // @grant        GM_getValue
@@ -46,7 +46,7 @@
     composer: {
       visibleKey: 'tweetapp_composer_visible',
       visibleDefault: true,
-      containerSelector: 'main div:has(textarea#public-tweet-input):not(:has(article)):not([role="dialog"] *), main div:has(textarea[name="compose-text"]):not(:has(article)):not([role="dialog"] *)',
+      containerSelector: 'main div:has(textarea#public-tweet-input):not(:has(article)):not([role="dialog"] *), main div:has(textarea[name="compose-text"]):not(:has(article)):not([role="dialog"] *):not(:has(textarea[placeholder*="reply" i]))',
       textareaSelector: 'textarea#public-tweet-input, textarea#public-modal-tweet-input, textarea[name="compose-text"], textarea',
     },
     autoplay: {
