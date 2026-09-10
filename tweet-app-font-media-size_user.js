@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Tweet.app Font/Width Adjust + Link Card + Composer Toggle
 // @namespace    https://imgd.net/
-// @version      1.8
+// @version      1.9
 // @description  Adjust font size and content width on app.tweet.app (with a tap-select panel), show OGP link cards for URLs in tweet text (with persistent cache), toggle the always-visible composer, and toggle video/GIF autoplay.
 // @match        https://app.tweet.app/*
 // @grant        GM_getValue
@@ -46,13 +46,12 @@
     composer: {
       visibleKey: 'tweetapp_composer_visible',
       visibleDefault: true,
-      containerSelector: 'div.px-4.pt-5.pb-4:has(#public-tweet-input)',
-      textareaSelector: 'textarea#public-tweet-input, textarea#public-modal-tweet-input, textarea[name="compose-text"]',
+      containerSelector: 'div:has(> textarea#public-tweet-input), div:has(> textarea[name="compose-text"])',
+      textareaSelector: 'textarea#public-tweet-input, textarea#public-modal-tweet-input, textarea[name="compose-text"], textarea',
     },
     autoplay: {
       enabledKey: 'tweetapp_autoplay_enabled',
       enabledDefault: true,
-      // ユーザー操作後、この時間は手動再生として扱う。
       manualPlayGraceMs: 1500,
     },
   };
@@ -86,10 +85,8 @@
   // 動画・GIF自動再生制御
   // ============================================================
 
-  // ユーザーが動画を操作した時刻を記録する。OFFでも手動再生ボタンは許可するため。
   const manualPlayUntil = new WeakMap();
 
-  /** article内のvideo要素かどうかを判定する(自動再生制御の対象かどうかの共通条件)。 */
   function isTrackedVideo(node) {
     return node instanceof HTMLVideoElement && !!node.closest('article');
   }
@@ -120,7 +117,6 @@
     video.pause();
   }
 
-  // 既に再生中ならplay()を再度呼ばない(MutationObserverとの無限ループ防止)。
   function startVideo(video) {
     if (!(video instanceof HTMLVideoElement)) return;
     video.autoplay = true;
@@ -152,14 +148,11 @@
     });
   }
 
-  // document-startで登録: Reactが動画を生成した直後のplay()も検出できるようにする。
   document.addEventListener('pointerdown', markManualVideoGesture, true);
   document.addEventListener('touchstart', markManualVideoGesture, true);
   document.addEventListener('mousedown', markManualVideoGesture, true);
   document.addEventListener('keydown', markManualVideoGesture, true);
 
-  // autoplay属性が無くてもJSからvideo.play()が直接呼ばれる場合があるため、
-  // playイベント自体を捕捉してOFF設定時は即座に停止する。
   document.addEventListener('play', (event) => {
     const video = event.target;
     if (!isTrackedVideo(video)) return;
@@ -171,7 +164,6 @@
     video.removeAttribute('autoplay');
   }, true);
 
-  // Safari等でplay直後にplayingまで進むケースに備える。
   document.addEventListener('playing', (event) => {
     const video = event.target;
     if (!isTrackedVideo(video)) return;
@@ -281,7 +273,7 @@
 
   function applyFontSizeToBodies(root = document) {
     const fontSize = fontSizeSetting.get();
-    root.querySelectorAll?.('article p.text-tl-app-text').forEach((p) => {
+    root.querySelectorAll?.('article p').forEach((p) => {
       p.style.setProperty('font-size', `${fontSize}px`, 'important');
       p.style.setProperty('line-height', '1.5', 'important');
     });
@@ -291,13 +283,11 @@
     const fontSize = fontSizeSetting.get();
     root.querySelectorAll?.(CONFIG.composer.textareaSelector).forEach((textarea) => {
       textarea.style.setProperty('font-size', `${fontSize}px`, 'important');
-      const mirror = textarea.parentElement?.querySelector('[aria-hidden="true"]');
-      mirror?.style.setProperty('font-size', `${fontSize}px`, 'important');
     });
   }
 
   // ============================================================
-  // 選択パネル
+  // 選択パネル & メニュー
   // ============================================================
 
   function showChoicePanel(title, items, currentIndex, onSelect) {
@@ -339,10 +329,6 @@
     document.body.appendChild(overlay);
   }
 
-  // ============================================================
-  // Tampermonkeyメニュー
-  // ============================================================
-
   function chooseFontSize() {
     const presets = CONFIG.font.presets;
     const items = presets.map((px) => `${px}px`);
@@ -357,7 +343,6 @@
     showChoicePanel('Select content width', items, curIdx, (i) => mediaPctSetting.set(presets[i].pct));
   }
 
-  /** ON/OFF(またはShow/Hide等)2択の選択パネルを表示する共通ヘルパー。 */
   function chooseBoolean(title, labels, setting) {
     const curIdx = setting.get() ? 0 : 1;
     showChoicePanel(title, labels, curIdx, (i) => setting.set(i === 0));
@@ -395,7 +380,7 @@
   }
 
   // ============================================================
-  // OGPキャッシュ
+  // OGPキャッシュ & リンクカード
   // ============================================================
 
   const ogpCache = new Map();
@@ -454,10 +439,6 @@
     if (!title && !image) return null;
     return { title, description, image: image ? { url: image } : null };
   }
-
-  // ============================================================
-  // リンクカード
-  // ============================================================
 
   function extractUrl(article) {
     return article.querySelector('p a[href^="http"]')?.href ?? null;
@@ -542,83 +523,29 @@
   }
 
   // ============================================================
-  // 投稿欄の判定
+  // DOM監視（最適化）
   // ============================================================
 
-  function isInsideComposer(el) {
-    if (!el) return false;
-    const textareas = document.querySelectorAll(CONFIG.composer.textareaSelector);
-    for (const ta of textareas) {
-      const root = ta.parentElement?.parentElement;
-      if (root?.contains(el)) return true;
-    }
-    return false;
-  }
-
-  // ============================================================
-  // DOM監視
-  // ============================================================
-
-  /**
-   * 追加ノード1件を処理する。投稿欄内部(IME変換中のミラー要素等)なら
-   * composerChanged.flagを立てて個別処理をスキップする。
-   */
-  function handleAddedNode(node, composerChanged) {
+  function handleAddedNode(node) {
     if (node.nodeType !== 1) return;
-
-    if (isInsideComposer(node)) {
-      composerChanged.flag = true;
-      return;
-    }
 
     if (node.matches?.('article')) processArticle(node);
     node.querySelectorAll?.('article').forEach(processArticle);
 
     applyFontSizeToBodies(node);
     applyAutoplaySetting(node);
-
-    if (node.matches?.(CONFIG.composer.textareaSelector) || node.querySelector?.(CONFIG.composer.textareaSelector)) {
-      composerChanged.flag = true;
-    }
-  }
-
-  /** characterData変更(テキスト編集)を処理する。投稿欄内部なら記事処理をスキップする。 */
-  function handleCharacterDataMutation(mutation, composerChanged) {
-    const targetEl = mutation.target.parentElement; // characterDataはテキストノードが対象
-    if (isInsideComposer(targetEl)) {
-      composerChanged.flag = true;
-      return;
-    }
-    const article = targetEl?.closest?.('article');
-    if (article) processArticle(article);
   }
 
   function startObserving() {
     const observer = new MutationObserver((mutations) => {
-      const composerChanged = { flag: false };
-
-      mutations.forEach((m) => {
-        if (m.type === 'attributes') {
-          // Reactの再描画でautoplay/srcが書き換わるケースに対応
-          if (isTrackedVideo(m.target)) applyAutoplayToVideo(m.target);
-          return;
-        }
-
-        m.addedNodes.forEach((node) => handleAddedNode(node, composerChanged));
-
-        if (m.type === 'characterData') handleCharacterDataMutation(m, composerChanged);
-      });
-
-      // 投稿欄の再描画は都度処理せず最後に1回だけ再適用する(IME入力時のカクつき防止)。
-      if (composerChanged.flag) applyFontSizeToComposers();
+      for (const m of mutations) {
+        m.addedNodes.forEach(handleAddedNode);
+      }
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true,
-      characterData: true,
-      attributes: true, // autoplay/srcの後変更に対応
-      attributeFilter: ['autoplay', 'src'],
     });
   }
 
@@ -634,7 +561,6 @@
     startObserving();
     document.querySelectorAll('article').forEach(processArticle);
 
-    // Reactの初期描画が遅れるケースに対応
     requestAnimationFrame(() => {
       applyStyles();
       applyAutoplaySetting();
@@ -645,7 +571,6 @@
     }, 500);
   }
 
-  // document-startで動作するため、bodyが生成されてから初期化する
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init, { once: true });
   } else {
