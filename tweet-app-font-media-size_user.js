@@ -46,7 +46,7 @@
     composer: {
       visibleKey: 'tweetapp_composer_visible',
       visibleDefault: true,
-      containerSelector: 'div:has(> textarea#public-tweet-input), div:has(> textarea[name="compose-text"])',
+      containerSelector: 'main div:has(textarea#public-tweet-input):not(:has(article)):not([role="dialog"] *), main div:has(textarea[name="compose-text"]):not(:has(article)):not([role="dialog"] *)',
       textareaSelector: 'textarea#public-tweet-input, textarea#public-modal-tweet-input, textarea[name="compose-text"], textarea',
     },
     autoplay: {
@@ -246,10 +246,28 @@
       if (document.documentElement) document.documentElement.appendChild(styleEl);
     }
 
+    const fontSize = fontSizeSetting.get();
     const mediaPct = mediaPctSetting.get();
     const composerVisible = composerVisibleSetting.get();
 
     styleEl.textContent = `
+      /* ツイート本文のフォントサイズ */
+      article p {
+        font-size: ${fontSize}px !important;
+        line-height: 1.5 !important;
+      }
+
+      /* 入力テキストエリアおよび裏側のミラー表示要素（文字＆カーソル位置ずれ防止） */
+      textarea#public-tweet-input,
+      textarea#public-modal-tweet-input,
+      textarea[name="compose-text"],
+      textarea,
+      div:has(> textarea) [aria-hidden="true"],
+      div:has(> textarea) div {
+        font-size: ${fontSize}px !important;
+        line-height: 1.5 !important;
+      }
+
       /* 画像・動画・リンクカードの表示幅 */
       article div.rounded-2xl.overflow-hidden,
       article div.${CONFIG.linkCard.className} {
@@ -258,7 +276,7 @@
         margin-right: auto !important;
       }
 
-      /* 常時表示の投稿欄 */
+      /* 常時表示の投稿欄（フィード最上部のみ） */
       ${composerVisible ? '' : `
       ${CONFIG.composer.containerSelector} {
         display: none !important;
@@ -283,6 +301,14 @@
     const fontSize = fontSizeSetting.get();
     root.querySelectorAll?.(CONFIG.composer.textareaSelector).forEach((textarea) => {
       textarea.style.setProperty('font-size', `${fontSize}px`, 'important');
+      textarea.style.setProperty('line-height', '1.5', 'important');
+
+      if (textarea.parentElement) {
+        textarea.parentElement.querySelectorAll('*').forEach((el) => {
+          el.style.setProperty('font-size', `${fontSize}px`, 'important');
+          el.style.setProperty('line-height', '1.5', 'important');
+        });
+      }
     });
   }
 
@@ -533,6 +559,7 @@
     node.querySelectorAll?.('article').forEach(processArticle);
 
     applyFontSizeToBodies(node);
+    applyFontSizeToComposers(node);
     applyAutoplaySetting(node);
   }
 
